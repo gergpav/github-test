@@ -24,41 +24,56 @@ jobs:
 
       - name: Build and push Docker image
         run: |
+          # Собираем Docker образ
           docker build -t ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} ./application
           
-          echo '${{ secrets.CI_REGISTRY_KEY }}' > key.json
-          cat key.json | docker login --username json_key --password-stdin cr.yandex
+          # Логинимся в Yandex Container Registry с помощью специального Action
+          echo '${{ secrets.CI_REGISTRY_KEY }}' > /tmp/key.json
+          cat /tmp/key.json | jq -r .private_key | docker login --username json_key --password-stdin cr.yandex
           
+          # Пушим образ в registry
           docker push ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
-          
-# команды для развертывания в тестовом окружении
+
+  # команды для развертывания в тестовом окружении
   deploy-test-env:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Deploy to testing environment
-        run: |
-          
-# команды для тестирования
+        uses: yc-actions/yc-deploy-serverless-container@v2
+        with:
+          yc-sa-json-credentials: ${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}
+          container-id: ${{ secrets.TESTING_CONTAINER_ID }}
+          folder-id: ${{ secrets.blog_testing }}
+          image: ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
+          service-account-id: ${{ secrets.TESTING_SA_ID }}
+
+  # команды для тестирования
   test:
     runs-on: ubuntu-latest
     needs: deploy-test-env
     steps:
       - name: Run tests
         run: |
-          
-# команды для удаления тестового окружения
+
+  # команды для удаления тестового окружения
   delete-test-env:
     runs-on: ubuntu-latest
     needs: test
     steps:
       - name: Delete testing environment
         run: |
-          
-# команды для развертывания в продакшн окружении
+
+  # команды для развертывания в продакшн окружении
   release:
     runs-on: ubuntu-latest
     needs: delete-test-env
     steps:
       - name: Deploy to production
-        run: |
+        uses: yc-actions/yc-deploy-serverless-container@v2
+        with:
+          yc-sa-json-credentials: ${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}
+          container-id: ${{ secrets.prod_container_id }}
+          folder-id: ${{ secrets.blog_prod }}
+          image: ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
+          service-account-id: ${{ secrets.PROD_SA_ID }}
