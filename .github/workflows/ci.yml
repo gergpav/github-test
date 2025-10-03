@@ -22,11 +22,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r application/requirements.txt
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         run: |
-          docker build -t ${{ secrets.CI_REGISTRY }}/my-app:${{ github.sha }} ./application
-          echo ${{ secrets.CI_REGISTRY_KEY }} | docker login ${{ secrets.CI_REGISTRY }} --username builder --password-stdin
+          docker build -t ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} ./application
+          
+          echo '${{ secrets.CI_REGISTRY_KEY }}' > key.json
+          cat key.json | docker login --username json_key --password-stdin cr.yandex
+          
           docker push ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
+          
 # команды для развертывания в тестовом окружении
   deploy-test-env:
     runs-on: ubuntu-latest
