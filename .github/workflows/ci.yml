@@ -27,12 +27,16 @@ jobs:
           # Собираем Docker образ
           docker build -t ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} ./application
           
-          # Логинимся в Yandex Container Registry с помощью специального Action
+          # Устанавливаем jq для обработки JSON
+          sudo apt-get update && sudo apt-get install -y jq
+          
+          # Обрабатываем JSON ключ и логинимся
           echo '${{ secrets.CI_REGISTRY_KEY }}' > /tmp/key.json
-          cat /tmp/key.json | jq -r .private_key | docker login --username json_key --password-stdin cr.yandex
+          cat /tmp/key.json | jq -r .private_key | tr -d '\r' | docker login --username json_key --password-stdin cr.yandex
           
           # Пушим образ в registry
           docker push ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
+
 
   # команды для развертывания в тестовом окружении
   deploy-test-env:
