@@ -33,8 +33,8 @@ jobs:
 
       - name: Configure YC CLI and push to registry
         run: |
-          # Просто сохраняем JSON как есть
-          echo '${{ secrets.CI_REGISTRY_KEY }}' > /tmp/registry-key.json
+          # Декодируем base64 и сохраняем JSON
+          echo '${{ secrets.CI_REGISTRY_KEY }}' | base64 -d > /tmp/registry-key.json
           
           # Настраиваем YC CLI
           $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/registry-key.json
@@ -58,8 +58,8 @@ jobs:
 
       - name: Deploy to testing environment
         run: |
-          # Сохраняем ключ
-          echo '${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}' > /tmp/testing-key.json
+          # Декодируем base64
+          echo '${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}' | base64 -d > /tmp/testing-key.json
           
           # Настраиваем и деплоим
           $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/testing-key.json
@@ -104,8 +104,8 @@ jobs:
 
       - name: Deploy to production
         run: |
-          # Сохраняем ключ
-          echo '${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}' > /tmp/prod-key.json
+          # Декодируем base64
+          echo '${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}' | base64 -d > /tmp/prod-key.json
           
           # Настраиваем и деплоим
           $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/prod-key.json
