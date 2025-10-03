@@ -26,22 +26,42 @@ jobs:
         run: |
           docker build -t ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} ./application
 
-      - name: Install and configure YC CLI
+      - name: Install YC CLI
         run: |
-          # Устанавливаем YC CLI в домашнюю директорию
           curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -a
-          
-          # Добавляем YC в PATH
           echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Configure YC CLI and push to registry
+        run: |
+          # Используем Python для обработки JSON и создания правильного файла
+          python3 -c "
+          import json, os, subprocess
           
-          # Создаем файл с ключом для registry
-          echo '${{ secrets.CI_REGISTRY_KEY }}' > /tmp/registry-key.json
+          # Получаем JSON ключ
+          key_json = '''${{ secrets.CI_REGISTRY_KEY }}'''
           
-          # Настраиваем YC CLI с ключом registry
+          try:
+              # Убираем проблемные символы Unicode
+              key_json = key_json.replace('\\u003c', '<').replace('\\u003e', '>')
+              
+              # Парсим JSON
+              data = json.loads(key_json)
+              
+              # Сохраняем в файл
+              with open('/tmp/registry-key.json', 'w') as f:
+                  json.dump(data, f, indent=2)
+              
+              print('✅ JSON key processed successfully')
+          except Exception as e:
+              print(f'❌ Error processing JSON: {e}')
+              exit(1)
+          "
+          
+          # Настраиваем YC CLI
           $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/registry-key.json
           $HOME/yandex-cloud/bin/yc config set folder-id ${{ secrets.blog_prod }}
           
-          # Настраиваем Docker для работы с Yandex Container Registry
+          # Настраиваем Docker
           $HOME/yandex-cloud/bin/yc container registry configure-docker
           
           # Пушим образ
@@ -59,14 +79,21 @@ jobs:
 
       - name: Deploy to testing environment
         run: |
-          # Создаем файл с ключом для testing
-          echo '${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}' > /tmp/testing-key.json
+          # Обрабатываем JSON ключ для testing
+          python3 -c "
+          import json, os
+          key_json = '''${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}'''
+          key_json = key_json.replace('\\u003c', '<').replace('\\u003e', '>')
+          data = json.loads(key_json)
+          with open('/tmp/testing-key.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          print('✅ Testing key processed')
+          "
           
-          # Настраиваем YC CLI с ключом testing
+          # Настраиваем и деплоим
           $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/testing-key.json
           $HOME/yandex-cloud/bin/yc config set folder-id ${{ secrets.blog_testing }}
           
-          # Деплоим в testing
           $HOME/yandex-cloud/bin/yc serverless container revision deploy \
             --container-id ${{ secrets.TESTING_CONTAINER_ID }} \
             --image ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} \
@@ -83,8 +110,6 @@ jobs:
       - name: Run tests
         run: |
           echo "Running basic health checks..."
-          # Здесь можно добавить реальные тесты, например:
-          # curl проверка что приложение отвечает
           echo "Tests completed successfully"
 
   # команды для удаления тестового окружения
@@ -95,8 +120,6 @@ jobs:
       - name: Delete testing environment
         run: |
           echo "Testing environment cleanup completed"
-          # В реальном сценарии можно удалить тестовые ревизии
-          # $HOME/yandex-cloud/bin/yc serverless container revision delete --id <revision-id>
 
   # команды для развертывания в продакшн окружении
   release:
@@ -110,14 +133,21 @@ jobs:
 
       - name: Deploy to production
         run: |
-          # Создаем файл с ключом для prod
-          echo '${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}' > /tmp/prod-key.json
+          # Обрабатываем JSON ключ для prod
+          python3 -c "
+          import json, os
+          key_json = '''${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}'''
+          key_json = key_json.replace('\\u003c', '<').replace('\\u003e', '>')
+          data = json.loads(key_json)
+          with open('/tmp/prod-key.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          print('✅ Production key processed')
+          "
           
-          # Настраиваем YC CLI с ключом prod
+          # Настраиваем и деплоим
           $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/prod-key.json
           $HOME/yandex-cloud/bin/yc config set folder-id ${{ secrets.blog_prod }}
           
-          # Деплоим в prod
           $HOME/yandex-cloud/bin/yc serverless container revision deploy \
             --container-id ${{ secrets.prod_container_id }} \
             --image ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} \
