@@ -1,0 +1,13 @@
+folder-id: b1g17m57imnldh908pvu
+app-container:
+  cores: 1
+  memory: 512mb
+  core-fraction: 100
+  concurrency: 8
+  timeout: 10
+  sa-id: aje9ebqthbqspetf45ut
+  secret-id: e6qmbmpvgpbnk1rlc4cd
+apigw:
+  sa-id: aje6uqtgqpjk87e5fbu0
+docapi:
+  endpoint: https://docapi.serverless.yandexcloud.net/ru-central1/b1g7j5do4ef1trip02pj/etnerj2sjdj1hv1uiek1

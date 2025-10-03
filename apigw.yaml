@@ -1,0 +1,17 @@
+openapi: 3.0.0
+info:
+  title: Django app
+  version: 1.0.0
+paths:
+  /{path+}:
+    x-yc-apigateway-any-method:
+      parameters:
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+      x-yc-apigateway-integration:
+        type: serverless_containers
+        container_id: "bba4lls17hliha4mdmoi"
+        service_account_id: ajebr33p1ip1elkv34k9
