@@ -26,20 +26,23 @@ jobs:
         run: |
           docker build -t ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} ./application
 
-      - name: Configure Yandex Cloud CLI and push to registry
+      - name: Install and configure YC CLI
         run: |
-          # Устанавливаем YC CLI
-          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local -n
+          # Устанавливаем YC CLI в домашнюю директорию
+          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -a
+          
+          # Добавляем YC в PATH
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
           
           # Создаем файл с ключом для registry
           echo '${{ secrets.CI_REGISTRY_KEY }}' > /tmp/registry-key.json
           
           # Настраиваем YC CLI с ключом registry
-          /usr/local/bin/yc config set service-account-key /tmp/registry-key.json
-          /usr/local/bin/yc config set folder-id ${{ secrets.blog_prod }}
+          $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/registry-key.json
+          $HOME/yandex-cloud/bin/yc config set folder-id ${{ secrets.blog_prod }}
           
           # Настраиваем Docker для работы с Yandex Container Registry
-          /usr/local/bin/yc container registry configure-docker
+          $HOME/yandex-cloud/bin/yc container registry configure-docker
           
           # Пушим образ
           docker push ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
@@ -49,20 +52,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Install YC CLI
+        run: |
+          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -a
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
       - name: Deploy to testing environment
         run: |
-          # Устанавливаем YC CLI
-          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local -n
-          
           # Создаем файл с ключом для testing
           echo '${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}' > /tmp/testing-key.json
           
           # Настраиваем YC CLI с ключом testing
-          /usr/local/bin/yc config set service-account-key /tmp/testing-key.json
-          /usr/local/bin/yc config set folder-id ${{ secrets.blog_testing }}
+          $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/testing-key.json
+          $HOME/yandex-cloud/bin/yc config set folder-id ${{ secrets.blog_testing }}
           
           # Деплоим в testing
-          /usr/local/bin/yc serverless container revision deploy \
+          $HOME/yandex-cloud/bin/yc serverless container revision deploy \
             --container-id ${{ secrets.TESTING_CONTAINER_ID }} \
             --image ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} \
             --service-account-id ${{ secrets.TESTING_SA_ID }} \
@@ -78,6 +83,8 @@ jobs:
       - name: Run tests
         run: |
           echo "Running basic health checks..."
+          # Здесь можно добавить реальные тесты, например:
+          # curl проверка что приложение отвечает
           echo "Tests completed successfully"
 
   # команды для удаления тестового окружения
@@ -88,26 +95,30 @@ jobs:
       - name: Delete testing environment
         run: |
           echo "Testing environment cleanup completed"
+          # В реальном сценарии можно удалить тестовые ревизии
+          # $HOME/yandex-cloud/bin/yc serverless container revision delete --id <revision-id>
 
   # команды для развертывания в продакшн окружении
   release:
     runs-on: ubuntu-latest
     needs: delete-test-env
     steps:
+      - name: Install YC CLI
+        run: |
+          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -a
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
       - name: Deploy to production
         run: |
-          # Устанавливаем YC CLI
-          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local -n
-          
           # Создаем файл с ключом для prod
           echo '${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}' > /tmp/prod-key.json
           
           # Настраиваем YC CLI с ключом prod
-          /usr/local/bin/yc config set service-account-key /tmp/prod-key.json
-          /usr/local/bin/yc config set folder-id ${{ secrets.blog_prod }}
+          $HOME/yandex-cloud/bin/yc config set service-account-key /tmp/prod-key.json
+          $HOME/yandex-cloud/bin/yc config set folder-id ${{ secrets.blog_prod }}
           
           # Деплоим в prod
-          /usr/local/bin/yc serverless container revision deploy \
+          $HOME/yandex-cloud/bin/yc serverless container revision deploy \
             --container-id ${{ secrets.prod_container_id }} \
             --image ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} \
             --service-account-id ${{ secrets.PROD_SA_ID }} \
