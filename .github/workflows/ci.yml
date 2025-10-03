@@ -26,14 +26,22 @@ jobs:
         run: |
           docker build -t ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} ./application
 
-      - name: Configure Yandex Cloud CLI
-        uses: yc-actions/yc-setup@v1
-        with:
-          yc-sa-json-credentials: ${{ secrets.CI_REGISTRY_KEY }}
-
-      - name: Push to Container Registry
+      - name: Configure Yandex Cloud CLI and push to registry
         run: |
-          yc container registry configure-docker
+          # Устанавливаем YC CLI
+          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local -n
+          
+          # Создаем файл с ключом для registry
+          echo '${{ secrets.CI_REGISTRY_KEY }}' > /tmp/registry-key.json
+          
+          # Настраиваем YC CLI с ключом registry
+          /usr/local/bin/yc config set service-account-key /tmp/registry-key.json
+          /usr/local/bin/yc config set folder-id ${{ secrets.blog_prod }}
+          
+          # Настраиваем Docker для работы с Yandex Container Registry
+          /usr/local/bin/yc container registry configure-docker
+          
+          # Пушим образ
           docker push ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
 
   # команды для развертывания в тестовом окружении
@@ -42,13 +50,25 @@ jobs:
     needs: build
     steps:
       - name: Deploy to testing environment
-        uses: yc-actions/yc-sls-container-deploy@v1
-        with:
-          yc-sa-json-credentials: ${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}
-          container-id: ${{ secrets.TESTING_CONTAINER_ID }}
-          folder-id: ${{ secrets.blog_testing }}
-          image: ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
-          service-account-id: ${{ secrets.TESTING_SA_ID }}
+        run: |
+          # Устанавливаем YC CLI
+          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local -n
+          
+          # Создаем файл с ключом для testing
+          echo '${{ secrets.SA_TESTING_DEPLOYER_PRIVATE_KEY }}' > /tmp/testing-key.json
+          
+          # Настраиваем YC CLI с ключом testing
+          /usr/local/bin/yc config set service-account-key /tmp/testing-key.json
+          /usr/local/bin/yc config set folder-id ${{ secrets.blog_testing }}
+          
+          # Деплоим в testing
+          /usr/local/bin/yc serverless container revision deploy \
+            --container-id ${{ secrets.TESTING_CONTAINER_ID }} \
+            --image ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} \
+            --service-account-id ${{ secrets.TESTING_SA_ID }} \
+            --cores 1 \
+            --memory 1GB \
+            --concurrency 1
 
   # команды для тестирования
   test:
@@ -75,10 +95,22 @@ jobs:
     needs: delete-test-env
     steps:
       - name: Deploy to production
-        uses: yc-actions/yc-sls-container-deploy@v1
-        with:
-          yc-sa-json-credentials: ${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}
-          container-id: ${{ secrets.prod_container_id }}
-          folder-id: ${{ secrets.blog_prod }}
-          image: ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }}
-          service-account-id: ${{ secrets.PROD_SA_ID }}
+        run: |
+          # Устанавливаем YC CLI
+          curl -s https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local -n
+          
+          # Создаем файл с ключом для prod
+          echo '${{ secrets.SA_PROD_DEPLOYER_PRIVATE_KEY }}' > /tmp/prod-key.json
+          
+          # Настраиваем YC CLI с ключом prod
+          /usr/local/bin/yc config set service-account-key /tmp/prod-key.json
+          /usr/local/bin/yc config set folder-id ${{ secrets.blog_prod }}
+          
+          # Деплоим в prod
+          /usr/local/bin/yc serverless container revision deploy \
+            --container-id ${{ secrets.prod_container_id }} \
+            --image ${{ secrets.CI_REGISTRY }}/cart-app:${{ github.sha }} \
+            --service-account-id ${{ secrets.PROD_SA_ID }} \
+            --cores 1 \
+            --memory 1GB \
+            --concurrency 1
